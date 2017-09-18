@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import ABCMeta, abstractmethod
+import six
 
 
 class KubernetesRequestFactory():
@@ -56,7 +57,7 @@ class KubernetesRequestFactory():
     @staticmethod
     def extract_labels(pod, req):
         req['metadata']['labels'] = req['metadata'].get('labels', {})
-        for k, v in pod.labels.iteritems():
+        for k, v in six.iteritems(pod.labels):
             req['metadata']['labels'][k] = v
 
     @staticmethod
@@ -116,3 +117,8 @@ class KubernetesRequestFactory():
             for secret in env_secrets:
                 KubernetesRequestFactory.add_secret_to_env(env, secret)
             req['spec']['containers'][0]['env'] = env
+
+    @staticmethod
+    def extract_init_containers(pod, req):
+        if pod.init_containers:
+            req['spec']['initContainers'] = pod.init_containers

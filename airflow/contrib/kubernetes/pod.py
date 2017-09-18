@@ -46,7 +46,8 @@ class Pod:
             volume_mounts=None,
             namespace='default',
             result=None,
-            image_pull_policy="IfNotPresent"):
+            image_pull_policy="IfNotPresent",
+            init_containers=None):
         self.image = image
         self.envs = envs or {}
         self.cmds = cmds
@@ -61,3 +62,4 @@ class Pod:
         self.namespace = namespace
         self.image_pull_policy = image_pull_policy
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.init_containers = init_containers

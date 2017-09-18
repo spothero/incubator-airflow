@@ -29,8 +29,13 @@ class PodLauncher:
 
     def run_pod_async(self, pod):
         req = self.kube_req_factory.create(pod)
-        print(json.dumps(req))
-        resp = self._client.create_namespaced_pod(body=req, namespace=pod.namespace)
+        self.logger.info('Pod Creation Request: \n{}'.format(json.dumps(req, indent=2)))
+        try:
+            resp = self._client.create_namespaced_pod(body=req, namespace=pod.namespace)
+            self.logger.info('Pod Creation Response: {}'.format(resp))
+        except client.rest.ApiException:
+            self.logger.exception('Exception when attempting to create Namespaced Pod.')
+            raise
         return resp
 
     def run_pod(self, pod):

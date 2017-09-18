@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 
-import kubernetes_request_factory as kreq
+from airflow.contrib.kubernetes.kubernetes_request_factory import KubernetesRequestFactory
 import yaml
 from airflow.contrib.kubernetes.pod import Pod
 from airflow import AirflowException
 
 
-class SimplePodRequestFactory(kreq.KubernetesRequestFactory):
+class SimplePodRequestFactory(KubernetesRequestFactory):
     """
         Request generator for a simple pod.
     """
@@ -50,4 +50,5 @@ spec:
         self.extract_volume_secrets(pod, req)
         self.attach_volumes(pod, req)
         self.attach_volume_mounts(pod, req)
+        self.extract_init_containers(pod, req)
         return req

@@ -247,10 +247,12 @@ class AirflowConfigParser(ConfigParser):
             options.pop('__name__', None)
 
         # add source
-        if display_source:
-            for section in cfg:
-                for k, v in cfg[section].items():
+        for section in cfg:
+            for k, v in cfg[section].items():
+                if display_source:
                     cfg[section][k] = (v, 'airflow config')
+                else:
+                    cfg[section][k] = expand_env_var(v)
 
         # add env vars and overwrite because they have priority
         for ev in [ev for ev in os.environ if ev.startswith('AIRFLOW__')]:
@@ -271,7 +273,7 @@ class AirflowConfigParser(ConfigParser):
 
         # add bash commands
         for (section, key) in AirflowConfigParser.as_command_stdout:
-            opt = self._get_cmd_option(section, key)
+            opt = self.get(section, key)
             if opt:
                 if not display_sensitive:
                     opt = '< hidden >'
