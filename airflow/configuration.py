@@ -247,12 +247,10 @@ class AirflowConfigParser(ConfigParser):
             options.pop('__name__', None)
 
         # add source
-        for section in cfg:
-            for k, v in cfg[section].items():
-                if display_source:
+        if display_source:
+            for section in cfg:
+                for k, v in cfg[section].items():
                     cfg[section][k] = (v, 'airflow config')
-                else:
-                    cfg[section][k] = expand_env_var(v)
 
         # add env vars and overwrite because they have priority
         for ev in [ev for ev in os.environ if ev.startswith('AIRFLOW__')]:
