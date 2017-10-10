@@ -37,6 +37,7 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.operators.python_operator import ShortCircuitOperator
 from airflow.ti_deps.deps.trigger_rule_dep import TriggerRuleDep
 from airflow.utils.state import State
+from airflow.utils.trigger_rule import TriggerRule
 from mock import patch
 from parameterized import parameterized
 
@@ -483,10 +484,38 @@ class DagRunTest(unittest.TestCase):
         state = dr.update_state()
         self.assertEqual(State.SUCCESS, state)
 
-        # upstream dependency failed, root has not run
-        ti_op1.set_state(State.NONE, session)
-        state = dr.update_state()
-        self.assertEqual(State.FAILED, state)
+    def test_dagrun_deadlock(self):
+        session = settings.Session()
+        dag = DAG(
+            'text_dagrun_deadlock',
+            start_date=DEFAULT_DATE,
+            default_args={'owner': 'owner1'})
+
+        with dag:
+            op1 = DummyOperator(task_id='A')
+            op2 = DummyOperator(task_id='B')
+            op2.trigger_rule = TriggerRule.ONE_FAILED
+            op2.set_upstream(op1)
+
+        dag.clear()
+        now = datetime.datetime.now()
+        dr = dag.create_dagrun(run_id='test_dagrun_deadlock',
+                               state=State.RUNNING,
+                               execution_date=now,
+                               start_date=now)
+
+        ti_op1 = dr.get_task_instance(task_id=op1.task_id)
+        ti_op1.set_state(state=State.SUCCESS, session=session)
+        ti_op2 = dr.get_task_instance(task_id=op2.task_id)
+        ti_op2.set_state(state=State.NONE, session=session)
+
+        dr.update_state()
+        self.assertEqual(dr.state, State.RUNNING)
+
+        ti_op2.set_state(state=State.NONE, session=session)
+        op2.trigger_rule = 'invalid'
+        dr.update_state()
+        self.assertEqual(dr.state, State.FAILED)
 
     def test_get_task_instance_on_empty_dagrun(self):
         """
@@ -836,7 +865,7 @@ class TaskInstanceTest(unittest.TestCase):
         ti = TI(
             task=task, execution_date=datetime.datetime.now())
         ti.run()
-        self.assertTrue(ti.state == models.State.SKIPPED)
+        self.assertEqual(models.State.SKIPPED, ti.state)
 
     def test_retry_delay(self):
         """
@@ -1157,6 +1186,22 @@ class TaskInstanceTest(unittest.TestCase):
         with self.assertRaises(TestError):
             ti.run()
 
+    def test_check_and_change_state_before_execution(self):
+        dag = models.DAG(dag_id='test_check_and_change_state_before_execution')
+        task = DummyOperator(task_id='task', dag=dag, start_date=DEFAULT_DATE)
+        ti = TI(
+            task=task, execution_date=datetime.datetime.now())
+        self.assertTrue(ti._check_and_change_state_before_execution())
+
+    def test_check_and_change_state_before_execution_dep_not_met(self):
+        dag = models.DAG(dag_id='test_check_and_change_state_before_execution')
+        task = DummyOperator(task_id='task', dag=dag, start_date=DEFAULT_DATE)
+        task2= DummyOperator(task_id='task2', dag=dag, start_date=DEFAULT_DATE)
+        task >> task2
+        ti = TI(
+            task=task2, execution_date=datetime.datetime.now())
+        self.assertFalse(ti._check_and_change_state_before_execution())
+        
 
 class ClearTasksTest(unittest.TestCase):
     def test_clear_task_instances(self):
