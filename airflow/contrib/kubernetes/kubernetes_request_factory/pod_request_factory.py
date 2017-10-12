@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 
 import yaml
-import airflow.contrib.kubernetes.kubernetes_request_factory.kubernetes_request_factory as kreq
+from airflow.contrib.kubernetes.kubernetes_request_factory.kubernetes_request_factory import KubernetesRequestFactory
 from airflow.contrib.kubernetes.pod import Pod
 
 

@@ -23,6 +23,7 @@ from kubernetes import watch, client
 from kubernetes.client.rest import ApiException
 from airflow.contrib.kubernetes.pod_launcher import PodLauncher
 from airflow.contrib.kubernetes.kube_client import get_kube_client
+from airflow.contrib.kubernetes.worker_configuration import WorkerConfiguration
 from airflow.executors.base_executor import BaseExecutor
 from airflow.models import TaskInstance, KubeResourceVersion
 from airflow.utils.state import State
@@ -50,11 +51,23 @@ class KubeConfig:
             return default
 
     def __init__(self):
-        self.core_configuration = configuration.as_dict(display_sensitive=True)['core']
+        configuration_dict = configuration.as_dict(display_sensitive=True)
+        self.core_configuration = configuration_dict['core']
+        self.airflow_home = configuration.get(self.core_section, 'airflow_home')
         self.dags_folder = configuration.get(self.core_section, 'dags_folder')
         self.parallelism = configuration.getint(self.core_section, 'PARALLELISM')
-        self.kube_image = configuration.get(self.kubernetes_section, 'container_image')
+        self.worker_container_repository = configuration.get(
+            self.kubernetes_section, 'worker_container_repository')
+        self.worker_container_tag = configuration.get(
+            self.kubernetes_section, 'worker_container_tag')
+        self.kube_image = '{}:{}'.format(
+            self.worker_container_repository, self.worker_container_tag)
         self.delete_worker_pods = self.safe_getboolean(self.kubernetes_section, 'delete_worker_pods', True)
+
+        # Airflow Kubernetes Secrets Object. Contains secrets for mounting into workers.
+        self.kube_secrets_object_name = self.safe_get(
+            self.kubernetes_section, 'kubernetes_secrets_object', None)
+        self.kube_secrets = configuration_dict.get('kubernetes_secrets', {})
 
         # The Kubernetes Namespace in which pods will be created by the executor. Note that if your
         # cluster has RBAC enabled, your scheduler will need service account permissions to
@@ -67,7 +80,7 @@ class KubeConfig:
         # The branch of the repository to be checked out
         self.git_branch = self.safe_get(self.kubernetes_section, 'git_branch', None)
         # Optionally, the directory in the git repository containing the dags
-        self.git_subpath = self.safe_get(self.kubernetes_section, 'git_subpath', None)
+        self.git_subpath = self.safe_get(self.kubernetes_section, 'git_subpath', '')
 
         # Optionally a user may supply a `git_user` and `git_password` for private repositories
         self.git_user = self.safe_get(self.kubernetes_section, 'git_user', None)
@@ -76,9 +89,25 @@ class KubeConfig:
         # NOTE: The user may optionally use a volume claim to mount a PV containing DAGs directly
         self.dags_volume_claim = self.safe_get(self.kubernetes_section, 'dags_volume_claim', None)
 
-        # This prop may optionally be set for either PV or Git Volumes and is used to located DAGs
-        # on a SubPath in the volume
+        # This prop may optionally be set for PV Claims and is used to locate DAGs on a SubPath
         self.dags_volume_subpath = self.safe_get(self.kubernetes_section, 'dags_volume_subpath', None)
+
+        # If the user is using the git-sync container to clone their repository via git,
+        # allow them to specify repository, tag, and pod name for the init container.
+        self.git_sync_container_repository = self.safe_get(
+            self.kubernetes_section, 'git_sync_container_repository',
+            'gcr.io/google-containers/git-sync-amd64')
+
+        self.git_sync_container_tag = self.safe_get(
+            self.kubernetes_section, 'git_sync_container_tag', 'v2.0.5')
+        self.git_sync_container = '{}:{}'.format(
+            self.git_sync_container_repository, self.git_sync_container_tag)
+
+        self.git_sync_init_container_name = self.safe_get(
+            self.kubernetes_section, 'git_sync_init_container_name', 'git-sync-clone')
+
+        # The worker pod requires a valid Airflow config to operate
+        self.airflow_configmap = self.safe_get(self.kubernetes_section, 'airflow_configmap', None)
 
         self._validate()
 
@@ -87,8 +116,13 @@ class KubeConfig:
             raise AirflowConfigException(
                 "In kubernetes mode you must set the following configs in the `kubernetes` section: "
                 "`dags_volume_claim` or "
-                "`git_repo and git_branch`"
+                "`git_repo and git_branch` "
             )
+        if not self.airflow_configmap:
+            raise AirflowConfigException(
+                "In kubernetes mode you must specify the Airflow ConfigMap in the "
+                "`kubernetes` section: "
+                "`airflow_configmap`")
 
 
 class PodMaker:
@@ -96,87 +130,10 @@ class PodMaker:
         self.logger = logging.getLogger(__name__)
         self.kube_config = kube_config
 
-    def _get_init_containers(self, volume_mounts):
-        """When using git to retrieve the DAGs, use the GitSync Init Container"""
-        if self.kube_config.dags_volume_claim:
-            return []
-
-        init_environment = [{
-                'name': 'GIT_SYNC_REPO',
-                'value': self.kube_config.git_repo
-            }, {
-                'name': 'GIT_SYNC_BRANCH',
-                'value': self.kube_config.git_branch
-            }, {
-                'name': 'GIT_SYNC_ROOT',
-                'value': self.kube_config.dags_folder
-            }, {
-                'name': 'GIT_SYNC_DEST',
-                'value': ''
-            }, {
-                'name': 'GIT_SYNC_ONE_TIME',
-                'value': 'true'
-            }]
-        if self.kube_config.git_user:
-            init_environment.append({
-                'name': 'GIT_SYNC_USERNAME',
-                'value': self.kube_config.git_user
-            })
-        if self.kube_config.git_password:
-            init_environment.append({
-                'name': 'GIT_SYNC_PASSWORD',
-                'value': self.kube_config.git_password
-            })
-
-        volume_mounts[0]['readOnly'] = False
-        return [{
-            'name': 'git-sync-clone',
-            'image': 'gcr.io/google-containers/git-sync-amd64:v2.0.5',
-            'securityContext': {'runAsUser': 0},
-            'env': init_environment,
-            'volumeMounts': volume_mounts
-        }]
-
-    def _get_volumes_and_mounts(self):
-        volume_name = "airflow-dags"
-        volumes = [{'name': 'airflow-dags'}]
-        volume_mounts = [{
-                "name": volume_name, "mountPath": self.kube_config.dags_folder,
-                "readOnly": True
-            }]
-
-        # A PV with the DAGs should be mounted
-        if self.kube_config.dags_volume_claim:
-            volumes[0]['persistentVolumeClaim'] = {"claimName": self.kube_config.dags_volume_claim}
-
-            if self.kube_config.dags_volume_subpath:
-                volume_mounts[0]["subPath"] = self.kube_config.dags_volume_subpath
-            return volumes, volume_mounts
-        # Use Kubernetes git-sync sidecar to retrieve the latest DAGs
-        else:
-            # Create a Shared Volume for the Git-Sync module to populate
-            volumes = [{"name": volume_name, "emptyDir": {}}]
-        return volumes, volume_mounts
-
-    def make_environment(self):
-        """Creates the Pod Executor's environment by extracting the Scheduler's core configuration
-        to be shared with the newly created Pod. The core configuration contains critical settings
-        such as SQLALchemy connection strings, S3 Logging Buckets, etc.
-        """
-        environment = {}
-        configuration_dict = configuration.as_dict(display_sensitive=True)
-        configuration_dict['core']['executor'] = 'LocalExecutor'
-        if self.kube_config.git_subpath:
-            configuration_dict['core']['dags_folder'] = '{}/{}'.format(
-                self.kube_config.dags_folder, self.kube_config.git_subpath.lstrip('/'))
-        for section, section_dict in six.iteritems(configuration_dict):
-            section_upper = section.upper()
-            for key, value in six.iteritems(section_dict):
-                environment['AIRFLOW__{}__{}'.format(section_upper, key.upper())] = value
-        return environment
-
     def make_pod(self, namespace, pod_id, dag_id, task_id, execution_date, airflow_command):
-        volumes, volume_mounts = self._get_volumes_and_mounts()
+        volumes, volume_mounts = WorkerConfiguration.get_volumes_and_mounts(self.kube_config)
+        worker_init_container_spec = WorkerConfiguration.get_init_containers(
+            self.kube_config, copy.deepcopy(volume_mounts))
         return Pod(
             namespace=namespace,
             name=pod_id,
@@ -189,8 +146,8 @@ class PodMaker:
                 "task_id": task_id,
                 "execution_date": execution_date
             },
-            envs=self.make_environment(),
-            init_containers=self._get_init_containers(copy.deepcopy(volume_mounts)),
+            envs=WorkerConfiguration.get_environment(self.kube_config),
+            init_containers=worker_init_container_spec,
             volumes=volumes,
             volume_mounts=volume_mounts
         )
