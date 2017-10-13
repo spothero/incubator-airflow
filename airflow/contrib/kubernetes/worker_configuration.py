@@ -113,8 +113,8 @@ class WorkerConfiguration:
     def get_secrets(cls, kube_config):
         """Defines any necessary secrets for the pod executor"""
         worker_secrets = []
-        for k8s_secret_obj, key_env_pair in six.iteritems(kube_config.kube_secrets):
-            k8s_secret_key, env_var_name = key_env_pair.split(':')
+        for env_var_name, obj_key_pair in six.iteritems(kube_config.kube_secrets):
+            k8s_secret_obj, k8s_secret_key = obj_key_pair.split(':')
             worker_secrets.append(Secret('env', env_var_name, k8s_secret_obj, k8s_secret_key))
         return worker_secrets
 
