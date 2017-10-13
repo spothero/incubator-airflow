@@ -14,6 +14,8 @@
 
 import six
 
+from airflow.contrib.kubernetes.secret import Secret
+
 
 class WorkerConfiguration:
     """Contains Kubernetes Airflow Worker configuration logic"""
@@ -33,10 +35,10 @@ class WorkerConfiguration:
                 'value': kube_config.git_branch
             }, {
                 'name': 'GIT_SYNC_ROOT',
-                'value': kube_config.dags_folder
+                'value': '/tmp'
             }, {
                 'name': 'GIT_SYNC_DEST',
-                'value': ''
+                'value': 'dags'
             }, {
                 'name': 'GIT_SYNC_ONE_TIME',
                 'value': 'true'
@@ -83,6 +85,7 @@ class WorkerConfiguration:
         }, {
             'name': config_volume_name,
             'mountPath': config_path,
+            'subPath': 'airflow.cfg',
             'readOnly': True
         }]
 
@@ -101,21 +104,23 @@ class WorkerConfiguration:
     @classmethod
     def get_environment(cls, kube_config):
         """Defines any necessary environment variables for the pod executor"""
-        env = [{
-            'name': 'AIRFLOW__CORE__AIRFLOW_HOME',
-            'value': kube_config.airflow_home
-        }]
-        if kube_config.kube_secrets_object_name:
-            env.extend([
-                {
-                    'name': env_var,
-                    'valueFrom': {
-                        'secretKeyRef': {
-                            'name': kube_config.kube_secrets_object_name,
-                            'key': secret_key
-                        }
-                    }
-                }
-                for secret_key, env_var in six.iteritems(kube_config.kube_secrets)
-            ])
-        return env
+        return {
+            'AIRFLOW__CORE__AIRFLOW_HOME': kube_config.airflow_home,
+            'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags'
+        }
+
+    @classmethod
+    def get_secrets(cls, kube_config):
+        """Defines any necessary secrets for the pod executor"""
+        worker_secrets = []
+        for k8s_secret_obj, key_env_pair in six.iteritems(kube_config.kube_secrets):
+            k8s_secret_key, env_var_name = key_env_pair.split(':')
+            worker_secrets.append(Secret('env', env_var_name, k8s_secret_obj, k8s_secret_key))
+        return worker_secrets
+
+    @classmethod
+    def get_image_pull_secrets(cls, kube_config):
+        """Extracts any image pull secrets for fetching container(s)"""
+        if not kube_config.image_pull_secrets:
+            return []
+        return kube_config.image_pull_secrets.split(',')

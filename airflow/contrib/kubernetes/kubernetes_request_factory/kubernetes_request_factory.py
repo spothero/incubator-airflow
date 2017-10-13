@@ -108,7 +108,7 @@ class KubernetesRequestFactory():
             })
 
     @staticmethod
-    def extract_secrets(pod, req):
+    def extract_env_and_secrets(pod, req):
         env_secrets = [s for s in pod.secrets if s.deploy_type == 'env']
         if len(pod.envs) > 0 or len(env_secrets) > 0:
             env = []
@@ -122,3 +122,15 @@ class KubernetesRequestFactory():
     def extract_init_containers(pod, req):
         if pod.init_containers:
             req['spec']['initContainers'] = pod.init_containers
+
+    @staticmethod
+    def extract_service_account_name(pod, req):
+        if pod.service_account_name:
+            req['spec']['serviceAccountName'] = pod.service_account_name
+
+    @staticmethod
+    def extract_image_pull_secrets(pod, req):
+        if pod.image_pull_secrets:
+            req['spec']['imagePullSecrets'] = [{
+                'name': pull_secret
+            } for pull_secret in pod.image_pull_secrets.split(',')]
