@@ -29,6 +29,6 @@ class Secret:
         :type key: ``str``
         """
         self.deploy_type = deploy_type
-        self.deploy_target = deploy_target
+        self.deploy_target = deploy_target.upper()
         self.secret = secret
         self.key = key
