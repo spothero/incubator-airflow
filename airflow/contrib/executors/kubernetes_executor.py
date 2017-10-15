@@ -211,12 +211,12 @@ class KubernetesJobWatcher(multiprocessing.Process, LoggingMixin, object):
 
 class AirflowKubernetesScheduler(LoggingMixin, object):
     def __init__(self, kube_config, task_queue, result_queue, session, kube_client):
-        self.log.info("creating kubernetes executor")
+        self.log.debug("creating kubernetes executor")
         self.kube_config = kube_config
         self.task_queue = task_queue
         self.result_queue = result_queue
         self.namespace = self.kube_config.kube_namespace
-        self.log.info("k8s: using namespace {}".format(self.namespace))
+        self.log.debug("k8s: using namespace {}".format(self.namespace))
         self.kube_client = kube_client
         self.launcher = PodLauncher(kube_client=self.kube_client)
         self.pod_maker = PodMaker(kube_config=self.kube_config)
@@ -245,11 +245,11 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
         status
         :return:
         """
-        self.log.info('k8s: job is {}'.format(str(next_job)))
+        self.log.debug('k8s: job is {}'.format(str(next_job)))
         key, command = next_job
         dag_id, task_id, execution_date = key
-        self.log.info("k8s: running for command {}".format(command))
-        self.log.info("k8s: launching image {}".format(self.kube_config.kube_image))
+        self.log.debug("k8s: running for command {}".format(command))
+        self.log.debug("k8s: launching image {}".format(self.kube_config.kube_image))
         try:
             pod = self.pod_maker.make_pod(
                 namespace=self.namespace, pod_id=self._create_pod_id(dag_id, task_id),
@@ -260,7 +260,7 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
             self.launcher.run_pod_async(pod)
         except Exception as ex:
             self.log.exception(ex)
-        self.log.info("k8s: Job created!")
+        self.debug.info("k8s: Job created!")
 
     def delete_pod(self, pod_id):
         if self.kube_config.delete_worker_pods:
@@ -286,7 +286,7 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
         self.log.info("Attempting to finish pod; pod_id: {}; state: {}; labels: {}".format(pod_id, state, labels))
         key = self._labels_to_key(labels)
         if key:
-            self.log.info("finishing job {}".format(key))
+            self.log.debug("finishing job {} - {} ({})".format(key, state, pod_id))
             self.result_queue.put((key, state, pod_id, resource_version))
 
     @staticmethod
