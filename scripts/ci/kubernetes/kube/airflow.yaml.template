@@ -93,7 +93,7 @@ spec:
         - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
           value: {{docker_tag}}
         - name: AIRFLOW__KUBERNETES__DELETE_WORKER_PODS
-          value: "False"
+          value: "True"
         # set these two confs
         - name: AIRFLOW__KUBERNETES__GIT_REPO
           value: https://github.com/grantnicholas/testdags.git
@@ -136,7 +136,7 @@ spec:
         - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
           value: {{docker_tag}}
         - name: AIRFLOW__KUBERNETES__DELETE_WORKER_PODS
-          value: "False"
+          value: "True"
         # set these two confs
         - name: AIRFLOW__KUBERNETES__GIT_REPO
           value: https://github.com/grantnicholas/testdags.git

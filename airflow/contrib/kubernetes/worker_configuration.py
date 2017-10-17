@@ -108,7 +108,8 @@ class WorkerConfiguration:
     def get_environment(cls, kube_config):
         """Defines any necessary environment variables for the pod executor"""
         env = {
-            'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags'
+            'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags',
+            'AIRFLOW__CORE__EXECUTOR': 'LocalExecutor'
         }
         if kube_config.airflow_configmap:
             env['AIRFLOW__CORE__AIRFLOW_HOME'] = kube_config.airflow_home
