@@ -56,13 +56,14 @@ spec:
         pod.beta.kubernetes.io/init-containers: '[
           {
               "name": "init",
-              "image": "{{docker_image}}",
+              "image": "{{docker_image}}:{{docker_tag}}",
               "imagePullPolicy": "IfNotPresent",
               "command": [
                 "bash", "-cx", "cd /usr/local/lib/python2.7/dist-packages/airflow && cp -R example_dags/* $AIRFLOW_HOME/dags/ && airflow initdb && alembic upgrade head"
               ],
               "env": [
-                {"name": "AIRFLOW__KUBERNETES__CONTAINER_IMAGE", "value": ""},
+                {"name": "AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY", "value": ""},
+                {"name": "AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG", "value": ""},
                 {"name": "AIRFLOW__KUBERNETES__DAGS_VOLUME_CLAIM", "value": "airflow-dags"},
                 {"name": "AIRFLOW__KUBERNETES__DAGS_VOLUME_SUBPATH", "value": "git"}
               ],
@@ -74,7 +75,7 @@ spec:
     spec:
       containers:
       - name: web
-        image: {{docker_image}}
+        image: {{docker_image}}:{{docker_tag}}
         imagePullPolicy: IfNotPresent
         ports:
         - name: web
@@ -87,10 +88,12 @@ spec:
               fieldPath: metadata.namespace
         - name: AIRFLOW__CORE__EXECUTOR
           value: KubernetesExecutor
-        - name: AIRFLOW__KUBERNETES__CONTAINER_IMAGE
+        - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY
           value: {{docker_image}}
+        - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
+          value: {{docker_tag}}
         - name: AIRFLOW__KUBERNETES__DELETE_WORKER_PODS
-          value: "True"
+          value: "False"
         # set these two confs
         - name: AIRFLOW__KUBERNETES__GIT_REPO
           value: https://github.com/grantnicholas/testdags.git
@@ -128,10 +131,12 @@ spec:
               fieldPath: metadata.namespace
         - name: AIRFLOW__CORE__EXECUTOR
           value: KubernetesExecutor
-        - name: AIRFLOW__KUBERNETES__CONTAINER_IMAGE
+        - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY
           value: {{docker_image}}
+        - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
+          value: {{docker_tag}}
         - name: AIRFLOW__KUBERNETES__DELETE_WORKER_PODS
-          value: "True"
+          value: "False"
         # set these two confs
         - name: AIRFLOW__KUBERNETES__GIT_REPO
           value: https://github.com/grantnicholas/testdags.git

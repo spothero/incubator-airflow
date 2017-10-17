@@ -106,7 +106,7 @@ class KubeConfig:
         self.git_sync_init_container_name = self.safe_get(
             self.kubernetes_section, 'git_sync_init_container_name', 'git-sync-clone')
 
-        # The worker pod requires a valid Airflow config to operate
+        # The worker pod may optionally have a  valid Airflow config loaded via a configmap
         self.airflow_configmap = self.safe_get(self.kubernetes_section, 'airflow_configmap', None)
 
         self._validate()
@@ -118,11 +118,6 @@ class KubeConfig:
                 "`dags_volume_claim` or "
                 "`git_repo and git_branch` "
             )
-        if not self.airflow_configmap:
-            raise AirflowConfigException(
-                "In kubernetes mode you must specify the Airflow ConfigMap in the "
-                "`kubernetes` section: "
-                "`airflow_configmap`")
 
 
 class PodMaker:
@@ -250,17 +245,14 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
         dag_id, task_id, execution_date = key
         self.log.debug("k8s: running for command {}".format(command))
         self.log.debug("k8s: launching image {}".format(self.kube_config.kube_image))
-        try:
-            pod = self.pod_maker.make_pod(
-                namespace=self.namespace, pod_id=self._create_pod_id(dag_id, task_id),
-                dag_id=dag_id, task_id=task_id, execution_date=self._datetime_to_label_safe_datestring(execution_date),
-                airflow_command=command
-            )
-            # the watcher will monitor pods, so we do not block.
-            self.launcher.run_pod_async(pod)
-        except Exception as ex:
-            self.log.exception(ex)
-        self.debug.info("k8s: Job created!")
+        pod = self.pod_maker.make_pod(
+            namespace=self.namespace, pod_id=self._create_pod_id(dag_id, task_id),
+            dag_id=dag_id, task_id=task_id, execution_date=self._datetime_to_label_safe_datestring(execution_date),
+            airflow_command=command
+        )
+        # the watcher will monitor pods, so we do not block.
+        self.launcher.run_pod_async(pod)
+        self.log.debug("k8s: Job created!")
 
     def delete_pod(self, pod_id):
         if self.kube_config.delete_worker_pods:

@@ -66,48 +66,53 @@ class WorkerConfiguration:
     @classmethod
     def get_volumes_and_mounts(cls, kube_config):
         """Determine volumes and volume mounts for Airflow workers"""
-        config_volume_name = "airflow-config"
         dags_volume_name = "airflow-dags"
         dags_path = '{}/{}'.format(kube_config.dags_folder, kube_config.git_subpath.lstrip('/'))
-        config_path = '{}/airflow.cfg'.format(kube_config.airflow_home)
         volumes = [{
             'name': dags_volume_name
-        }, {
-            'name': config_volume_name,
-            'configMap': {
-                'name': kube_config.airflow_configmap
-            }
         }]
         volume_mounts = [{
             'name': dags_volume_name,
             'mountPath': dags_path,
             'readOnly': True
-        }, {
-            'name': config_volume_name,
-            'mountPath': config_path,
-            'subPath': 'airflow.cfg',
-            'readOnly': True
         }]
+
+        # Mount the airflow.cfg file via a configmap the user has specified
+        if kube_config.airflow_configmap:
+            config_volume_name = "airflow-config"
+            config_path = '{}/airflow.cfg'.format(kube_config.airflow_home)
+            volumes.append({
+                'name': config_volume_name,
+                'configMap': {
+                    'name': kube_config.airflow_configmap
+                }
+            })
+            volume_mounts.append({
+                'name': config_volume_name,
+                'mountPath': config_path,
+                'subPath': 'airflow.cfg',
+                'readOnly': True
+            })
 
         # A PV with the DAGs should be mounted
         if kube_config.dags_volume_claim:
             volumes[0]['persistentVolumeClaim'] = {"claimName": kube_config.dags_volume_claim}
-
             if kube_config.dags_volume_subpath:
                 volume_mounts[0]["subPath"] = kube_config.dags_volume_subpath
-            return volumes, volume_mounts
-
-        # Create a Shared Volume for the Git-Sync module to populate
-        volumes[0]["emptyDir"] = {}
+        else:
+            # Create a Shared Volume for the Git-Sync module to populate
+            volumes[0]["emptyDir"] = {}
         return volumes, volume_mounts
 
     @classmethod
     def get_environment(cls, kube_config):
         """Defines any necessary environment variables for the pod executor"""
-        return {
-            'AIRFLOW__CORE__AIRFLOW_HOME': kube_config.airflow_home,
+        env = {
             'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags'
         }
+        if kube_config.airflow_configmap:
+            env['AIRFLOW__CORE__AIRFLOW_HOME'] = kube_config.airflow_home
+        return env
 
     @classmethod
     def get_secrets(cls, kube_config):
