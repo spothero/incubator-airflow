@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
+
 import os
 import multiprocessing
 import six
@@ -28,7 +28,6 @@ from airflow.models import TaskInstance, KubeResourceVersion
 from airflow.utils.state import State
 from airflow import configuration, settings
 from airflow.exceptions import AirflowConfigException
-from airflow.contrib.kubernetes.pod import Pod
 from airflow.utils.log.logging_mixin import LoggingMixin
 
 class KubeConfig:
@@ -120,36 +119,6 @@ class KubeConfig:
             )
 
 
-class PodMaker:
-    def __init__(self, kube_config):
-        self.kube_config = kube_config
-
-    def make_pod(self, namespace, pod_id, dag_id, task_id, execution_date, airflow_command):
-        volumes, volume_mounts = WorkerConfiguration.get_volumes_and_mounts(self.kube_config)
-        worker_init_container_spec = WorkerConfiguration.get_init_containers(
-            self.kube_config, copy.deepcopy(volume_mounts))
-        return Pod(
-            namespace=namespace,
-            name=pod_id,
-            image=self.kube_config.kube_image,
-            cmds=["bash", "-cx", "--"],
-            args=[airflow_command],
-            labels={
-                "airflow-slave": "",
-                "dag_id": dag_id,
-                "task_id": task_id,
-                "execution_date": execution_date
-            },
-            envs=WorkerConfiguration.get_environment(self.kube_config),
-            secrets=WorkerConfiguration.get_secrets(self.kube_config),
-            service_account_name=self.kube_config.worker_service_account_name,
-            image_pull_secrets=self.kube_config.image_pull_secrets,
-            init_containers=worker_init_container_spec,
-            volumes=volumes,
-            volume_mounts=volume_mounts
-        )
-
-
 class KubernetesJobWatcher(multiprocessing.Process, LoggingMixin, object):
     def __init__(self, namespace, watcher_queue, resource_version):
         multiprocessing.Process.__init__(self)
@@ -214,7 +183,7 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
         self.log.debug("k8s: using namespace {}".format(self.namespace))
         self.kube_client = kube_client
         self.launcher = PodLauncher(kube_client=self.kube_client)
-        self.pod_maker = PodMaker(kube_config=self.kube_config)
+        self.worker_configuration = WorkerConfiguration(kube_config=self.kube_config)
         self.watcher_queue = multiprocessing.Queue()
         self._session = session
         self.kube_watcher = self._make_kube_watcher()
@@ -245,7 +214,7 @@ class AirflowKubernetesScheduler(LoggingMixin, object):
         dag_id, task_id, execution_date = key
         self.log.debug("k8s: running for command {}".format(command))
         self.log.debug("k8s: launching image {}".format(self.kube_config.kube_image))
-        pod = self.pod_maker.make_pod(
+        pod = self.worker_configuration.make_pod(
             namespace=self.namespace, pod_id=self._create_pod_id(dag_id, task_id),
             dag_id=dag_id, task_id=task_id, execution_date=self._datetime_to_label_safe_datestring(execution_date),
             airflow_command=command
