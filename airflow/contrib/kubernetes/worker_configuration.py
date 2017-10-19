@@ -123,7 +123,7 @@ class WorkerConfiguration:
         """Defines any necessary secrets for the pod executor"""
         worker_secrets = []
         for env_var_name, obj_key_pair in six.iteritems(self.kube_config.kube_secrets):
-            k8s_secret_obj, k8s_secret_key = obj_key_pair.split(':')
+            k8s_secret_obj, k8s_secret_key = obj_key_pair.split('=')
             worker_secrets.append(Secret('env', env_var_name, k8s_secret_obj, k8s_secret_key))
         return worker_secrets
 
