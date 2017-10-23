@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import os
 import multiprocessing
 import six
@@ -68,11 +69,6 @@ class KubeConfig:
         self.image_pull_secrets = self.safe_get(
             self.kubernetes_section, 'image_pull_secrets', '')
 
-        # The Kubernetes Namespace in which pods will be created by the executor. Note that if your
-        # cluster has RBAC enabled, your scheduler will need service account permissions to
-        # create, watch, get, and delete pods in this namespace.
-        self.kube_namespace = self.safe_get(self.kubernetes_section, 'namespace', 'default')
-
         # NOTE: `git_repo` and `git_branch` must be specified together as a pair
         # The http URL of the git repository to clone from
         self.git_repo = self.safe_get(self.kubernetes_section, 'git_repo', None)
@@ -90,6 +86,17 @@ class KubeConfig:
 
         # This prop may optionally be set for PV Claims and is used to locate DAGs on a SubPath
         self.dags_volume_subpath = self.safe_get(self.kubernetes_section, 'dags_volume_subpath', None)
+
+        # The Kubernetes Namespace in which the Scheduler and Webserver reside. Note that if your
+        # cluster has RBAC enabled, your scheduler may need service account permissions to
+        # create, watch, get, and delete pods in this namespace.
+        self.kube_namespace = self.safe_get(self.kubernetes_section, 'namespace', 'default')
+        # The Kubernetes Namespace in which pods will be created by the executor. Note that if your
+        # cluster has RBAC enabled, your workers may need service account permissions to
+        # interact with cluster components.
+        self.executor_namespace = self.safe_get(self.kubernetes_section, 'namespace', 'default')
+        # Task secrets managed by KubernetesExecutor.
+        self.gcp_service_account_keys = self.safe_get(self.kubernetes_section, 'gcp_service_account_keys', None)
 
         # If the user is using the git-sync container to clone their repository via git,
         # allow them to specify repository, tag, and pod name for the init container.
@@ -351,6 +358,35 @@ class KubernetesExecutor(BaseExecutor, LoggingMixin):
 
         self._session.commit()
 
+    def _inject_secrets(self):
+        def _create_or_update_secret(secret_name, secret_path):
+            try:
+                return self.kube_client.create_namespaced_secret(
+                    self.kube_config.executor_namespace, kubernetes.client.V1Secret(
+                        data={'key.json' : base64.b64encode(open(secret_path, 'r').read())},
+                        metadata=kubernetes.client.V1ObjectMeta(name=secret_name)))
+            except ApiException as e:
+                if e.status == 409:
+                    return self.kube_client.replace_namespaced_secret(
+                        secret_name, self.kube_config.executor_namespace,
+                        kubernetes.client.V1Secret(
+                            data={'key.json' : base64.b64encode(open(secret_path, 'r').read())},
+                            metadata=kubernetes.client.V1ObjectMeta(name=secret_name)))
+                self.log.exception("Exception while trying to inject secret."
+                                      "Secret name: {}, error details: {}.".format(secret_name, e))
+                raise
+
+        # For each GCP service account key, inject it as a secret in executor
+        # namespace with the specific secret name configured in the airflow.cfg.
+        # We let exceptions to pass through to users.
+        if self.kube_config.gcp_service_account_keys:
+            name_path_pair_list = [
+                {'name' : account_spec.strip().split('=')[0],
+                 'path' : account_spec.strip().split('=')[1]}
+                for account_spec in self.kube_config.gcp_service_account_keys.split(',')]
+            for service_account in name_path_pair_list:
+                _create_or_update_secret(service_account['name'], service_account['path'])
+
     def start(self):
         self.log.info('k8s: starting kubernetes executor')
         self._session = settings.Session()
@@ -360,6 +396,7 @@ class KubernetesExecutor(BaseExecutor, LoggingMixin):
         self.kube_scheduler = AirflowKubernetesScheduler(
             self.kube_config, self.task_queue, self.result_queue, self._session, self.kube_client
         )
+        self._inject_secrets()
         self.clear_not_launched_queued_tasks()
 
     def execute_async(self, key, command, queue=None):
