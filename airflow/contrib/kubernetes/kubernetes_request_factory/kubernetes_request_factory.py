@@ -18,18 +18,18 @@ import six
 
 class KubernetesRequestFactory():
     """
-        Create requests to be sent to kube API. Extend this class
-        to talk to kubernetes and generate your specific resources.
-        This is equivalent of generating yaml files that can be used
-        by `kubectl`
+    Create requests to be sent to kube API. Extend this class to talk to kubernetes and generate
+    your specific resources. This is equivalent of generating yaml files that can be used by
+    `kubectl`
     """
     __metaclass__ = ABCMeta
 
     @abstractmethod
     def create(self, pod):
         """
-            Creates the request for kubernetes API.
-            :param pod: The pod object
+        Creates the request for kubernetes API.
+
+        :param pod: The pod object
         """
         pass
 
@@ -80,7 +80,8 @@ class KubernetesRequestFactory():
     @staticmethod
     def attach_volume_mounts(pod, req):
         if len(pod.volume_mounts) > 0:
-            req['spec']['containers'][0]['volumeMounts'] = req['spec']['containers'][0].get('volumeMounts', [])
+            req['spec']['containers'][0]['volumeMounts'] = (
+                req['spec']['containers'][0].get('volumeMounts', []))
             req['spec']['containers'][0]['volumeMounts'].extend(pod.volume_mounts)
 
     @staticmethod
