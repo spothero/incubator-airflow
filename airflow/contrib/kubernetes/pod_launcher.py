@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import enum
+
 import json
 
 from airflow.contrib.kubernetes.pod import Pod
@@ -26,7 +26,7 @@ from kubernetes.client.rest import ApiException
 from .kube_client import get_kube_client
 
 
-class PodStatus(enum.Enum):
+class PodStatus(object):
     PENDING = 'pending'
     RUNNING = 'running'
     FAILED = 'failed'
@@ -79,15 +79,15 @@ class PodLauncher(LoggingMixin):
         return self._client.read_namespaced_pod(pod.name, pod.namespace)
 
     def process_status(self, job_id, status):
-        if status == PodStatus.PENDING.value:
+        if status == PodStatus.PENDING:
             return State.QUEUED
-        elif status == PodStatus.FAILED.value:
+        elif status == PodStatus.FAILED:
             self.log.info("Event: {} Failed".format(job_id))
             return State.FAILED
-        elif status == PodStatus.SUCCEEDED.value:
+        elif status == PodStatus.SUCCEEDED:
             self.log.info("Event: {} Succeeded".format(job_id))
             return State.SUCCESS
-        elif status == PodStatus.RUNNING.value:
+        elif status == PodStatus.RUNNING:
             return State.RUNNING
         else:
             self.log.info("Event: Invalid state {} on job {}".format(status, job_id))
