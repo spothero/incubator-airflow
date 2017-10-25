@@ -257,6 +257,17 @@ The logs for airflow tasks can be seen in airflow UI as usual.
 For more information about mesos, refer to `mesos documentation <http://mesos.apache.org/documentation/latest/>`_.
 For any queries/bugs on `MesosExecutor`, please contact `@kapil-malik <https://github.com/kapil-malik>`_.
 
+Scaling Out on Kubernetes (community contributed)
+'''''''''''''''''''''''''''''''''''''''''''''''''
+``KubernetesExecutor`` allows you to schedule airflow tasks as Pods within a Kubernetes Cluster.
+Prior to using the KubernetesExecutor you must already have a running Kubernetes Cluster (1.7+).
+Additionally, if your cluster is using RBAC you will need the correct level of permissions to
+interact with a number of cluster components in at least one namespace, namely:
+
+  * Secrets
+the ri
+
+
 Integration with systemd
 ''''''''''''''''''''''''
 Airflow can integrate with systemd based systems. This makes watching your
