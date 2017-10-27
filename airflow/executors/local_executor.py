@@ -73,7 +73,7 @@ class LocalExecutor(BaseExecutor):
         for w in self.workers:
             w.start()
 
-    def execute_async(self, key, command, queue=None):
+    def execute_async(self, key, command, queue=None, executor_config=None):
         self.queue.put((key, command))
 
     def sync(self):
