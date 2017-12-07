@@ -54,6 +54,7 @@ env:
     - TOX_ENV=py34-backend_sqlite
     - TOX_ENV=py34-backend_postgres
     - TOX_ENV=flake8
+    - TOX_ENV=py27-cdh-airflow_backend_postgres RUN_KUBE_INTEGRATION=true
 matrix:
   exclude:
     - python: "3.4"
@@ -70,6 +71,10 @@ matrix:
       env: TOX_ENV=py34-backend_postgres
     - python: "2.7"
       env: TOX_ENV=flake8
+    - python: "3.4"
+      env: TOX_ENV=py34-cdh-airflow_backend_postgres RUN_KUBE_INTEGRATION=true
+  allow_failures:
+    - env: TOX_ENV=py27-cdh-airflow_backend_postgres RUN_KUBE_INTEGRATION=true
 cache:
   directories:
     - $HOME/.wheelhouse/
