@@ -55,7 +55,6 @@ class PodLauncher(LoggingMixin):
         if resp.status.start_time is None:
             self.log.debug('Pod not yet started')
 
-        self.log.debug(resp)
         final_status = self._monitor_pod(pod)
         return final_status
 
