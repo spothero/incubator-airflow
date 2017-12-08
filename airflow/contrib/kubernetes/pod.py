@@ -63,6 +63,8 @@ class Pod:
             namespace='default',
             result=None,
             image_pull_policy="IfNotPresent",
+            image_pull_secrets=None,
+            init_containers=None,
             service_account_name=None,
             resources=None
     ):
@@ -79,5 +81,7 @@ class Pod:
         self.node_selectors = node_selectors or []
         self.namespace = namespace
         self.image_pull_policy = image_pull_policy
+        self.image_pull_secrets = image_pull_secrets
+        self.init_containers = init_containers
         self.service_account_name = service_account_name
         self.resources = resources or Resources()
