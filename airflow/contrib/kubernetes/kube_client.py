@@ -14,21 +14,22 @@
 
 from airflow import configuration
 
+
 def load_kube_config(in_cluster=True):
     from kubernetes import config, client
     if in_cluster:
         config.load_incluster_config()
         return client.CoreV1Api()
-    elif configuration.get('kubernetes','cluster_ip'):
+    elif configuration.get('kubernetes', 'cluster_ip'):
         config.load_kube_config(configuration.get('kubernetes', 'cluster_ip'))
     else:
         NotImplementedError(
             "requires incluster config or defined configuration in airflow.cfg")
 
+
 def get_kube_client(in_cluster=True):
     # TODO: This should also allow people to point to a cluster.
 
-    from kubernetes import config, client
+    from kubernetes import client
     load_kube_config(in_cluster)
     return client.CoreV1Api()
-

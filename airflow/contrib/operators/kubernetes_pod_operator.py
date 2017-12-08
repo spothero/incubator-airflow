@@ -12,22 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from builtins import str
-import dill
-import inspect
-import os
-import pickle
-import subprocess
-import sys
-import types
-
 from airflow.exceptions import AirflowException
-from airflow.models import BaseOperator, SkipMixin
+from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
-from airflow.utils.file import TemporaryDirectory
 from airflow.contrib.kubernetes import kube_client, pod_generator, pod_launcher
-from textwrap import dedent
 from airflow.utils.state import State
+
 
 template_fields = ('templates_dict',)
 template_ext = tuple()
@@ -54,7 +44,7 @@ class KubernetesPodOperator(BaseOperator):
             if final_state != State.SUCCESS:
                 raise AirflowException("Pod returned a failure")
 
-        except:
+        except Exception as ex:
             raise AirflowException("Pod Launching failed")
 
     @apply_defaults

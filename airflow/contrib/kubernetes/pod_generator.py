@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import os
-import six
 
 from airflow.contrib.kubernetes.pod import Pod, Resources
-from airflow.contrib.kubernetes.secret import Secret
 
 
 class PodGenerator:
@@ -282,7 +279,7 @@ class WorkerGenerator(PodGenerator):
                         execution_date,
                         airflow_command,
                         kube_executor_config):
-        cmds=["bash", "-cx", "--"]
+        cmds = ["bash", "-cx", "--"]
         labels = self._init_labels(dag_id, task_id, execution_date)
         PodGenerator.make_pod(self,
                               namespace=namespace,

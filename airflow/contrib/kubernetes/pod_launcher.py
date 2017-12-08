@@ -15,11 +15,9 @@
 
 import json
 import time
-from airflow.contrib.kubernetes.pod import Pod
 from airflow.utils.log.logging_mixin import LoggingMixin
 from airflow.utils.state import State
 from kubernetes import watch
-from kubernetes.client import V1Pod
 from kubernetes.client.rest import ApiException
 
 from .kube_client import get_kube_client
@@ -34,7 +32,6 @@ class PodStatus(object):
 
 class PodLauncher(LoggingMixin):
     def __init__(self, kube_client=None):
-        self.kube_req_factory = SimplePodRequestFactory()
         self._client = kube_client or get_kube_client()
         self._watch = watch.Watch()
 
@@ -55,6 +52,10 @@ class PodLauncher(LoggingMixin):
         Launches the pod synchronously and waits for completion.
         """
         resp = self.run_pod_async(pod)
+        if resp.status.start_time is None:
+            self.log.debug('Pod not yet started')
+
+        self.log.debug(resp)
         final_status = self._monitor_pod(pod)
         return final_status
 

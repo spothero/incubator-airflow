@@ -15,7 +15,12 @@
 
 
 class Resources:
-    def __init__(self, request_memory=None, request_cpu=None, limit_memory=None, limit_cpu=None):
+    def __init__(
+            self,
+            request_memory=None,
+            request_cpu=None,
+            limit_memory=None,
+            limit_cpu=None):
         self.request_memory = request_memory
         self.request_cpu = request_cpu
         self.limit_memory = limit_memory

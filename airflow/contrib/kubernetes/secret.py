@@ -17,9 +17,11 @@ class Secret:
     """Defines Kubernetes Secret Containers"""
 
     def __init__(self, deploy_type, deploy_target, secret, key):
-        """Initialize a Kubernetes Secret Object. Used to track requested secrets from the user.
+        """Initialize a Kubernetes Secret Object. Used to track requested secrets from
+        the user.
 
-        :param deploy_type: The type of secret deploy in Kubernetes, either `env` or `volume`
+        :param deploy_type: The type of secret deploy in Kubernetes, either `env` or
+            `volume`
         :type deploy_type: ``str``
         :param deploy_target: The environment variable to be created in the worker.
         :type deploy_target: ``str``

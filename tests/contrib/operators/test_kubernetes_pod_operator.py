@@ -18,17 +18,17 @@
 import unittest
 from airflow.contrib.operators.kubernetes_pod_operator import KubernetesPodOperator
 from airflow import AirflowException
+
+
 class KubernetesPodOperatorTest(unittest.TestCase):
     @unittest
     def test_working_pod(self):
         k = KubernetesPodOperator(namespace='default',
                                   cmds=["bash", "-cx"],
-                                  arguments=["sleep","10"],
-                                  labels={"foo":"bar"},
+                                  arguments=["sleep", "10"],
+                                  labels={"foo": "bar"},
                                   name="test",
                                   task_id="task")
-
-
 
         with self.assertRaises(AirflowException):
             k.execute(None)
