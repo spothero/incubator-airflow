@@ -33,9 +33,9 @@ class PodGenerator:
 
     def set_environment(self, env):
         """
-        
+
         Args:
-            env (str): 
+            env (str):
 
         Returns:
 
@@ -53,17 +53,17 @@ class PodGenerator:
                            volume_mounts
                            ):
         """
-        
+
         Adds an init container to the launched pod. useful for pre-
-        
+
         Args:
             name (str):
-            image (str): 
-            securityContext (dict): 
-            init_environment (dict): 
-            volume_mounts (dict): 
+            image (str):
+            securityContext (dict):
+            init_environment (dict):
+            volume_mounts (dict):
 
-        Returns: 
+        Returns:
 
         """
         self.init_containers.append(
@@ -81,9 +81,9 @@ class PodGenerator:
 
     def add_volume(self, name):
         """
-        
+
         Args:
-            name (str): 
+            name (str):
 
         Returns:
 
@@ -104,12 +104,12 @@ class PodGenerator:
                   sub_path,
                   read_only):
         """
-        
+
         Args:
-            name (str): 
-            mount_path (str): 
-            sub_path (str): 
-            read_only: 
+            name (str):
+            mount_path (str):
+            sub_path (str):
+            read_only:
 
         Returns:
 
@@ -161,7 +161,7 @@ class PodGenerator:
 
 
 '''
-This class is a necessary building block to the kubernetes executor, which will be PR'd 
+This class is a necessary building block to the kubernetes executor, which will be PR'd
 shortly
 '''
 
