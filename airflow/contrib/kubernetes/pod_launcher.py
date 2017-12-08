@@ -16,8 +16,6 @@
 import json
 import time
 from airflow.contrib.kubernetes.pod import Pod
-from airflow.contrib.kubernetes.kubernetes_request_factory.pod_request_factory import (
-    SimplePodRequestFactory)
 from airflow.utils.log.logging_mixin import LoggingMixin
 from airflow.utils.state import State
 from kubernetes import watch
