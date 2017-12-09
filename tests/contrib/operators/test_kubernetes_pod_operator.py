@@ -33,3 +33,4 @@ class KubernetesPodOperatorTest(unittest.TestCase):
         with self.assertRaises(AirflowException):
             k.execute(None)
             print("foo")
+
