@@ -54,11 +54,10 @@ class KubernetesPodOperator(BaseOperator):
                  arguments,
                  labels,
                  name,
-                 task_id,
                  *args,
                  **kwargs):
-        super(KubernetesPodOperator, self).__init__(task_id, *args, **kwargs)
-        self.namespace = namespace,
+        super(KubernetesPodOperator, self).__init__(*args, **kwargs)
+        self.namespace = namespace
         self.cmds = cmds
         self.arguments = arguments
         self.labels = labels

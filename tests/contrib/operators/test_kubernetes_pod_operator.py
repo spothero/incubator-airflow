@@ -21,7 +21,7 @@ from airflow import AirflowException
 
 
 class KubernetesPodOperatorTest(unittest.TestCase):
-    @unittest
+
     def test_working_pod(self):
         k = KubernetesPodOperator(namespace='default',
                                   cmds=["bash", "-cx"],
@@ -32,5 +32,3 @@ class KubernetesPodOperatorTest(unittest.TestCase):
 
         with self.assertRaises(AirflowException):
             k.execute(None)
-            print("foo")
-
